@@ -11,7 +11,7 @@ import { Settings, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
       const response = await fetch('/api/auth/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: email, password }),
       });
 
       const data = await response.json();
@@ -67,13 +67,13 @@ export default function AdminLoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-slate-300">Username</Label>
+              <Label htmlFor="email" className="text-slate-300">Email</Label>
               <Input
-                id="username"
+                id="email"
                 type="text"
-                placeholder="Masukkan username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Masukkan email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
                 required
                 disabled={isLoading}
@@ -97,7 +97,7 @@ export default function AdminLoginPage() {
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-              disabled={isLoading || !username || !password}
+              disabled={isLoading || !email || !password}
             >
               {isLoading ? (
                 <>
