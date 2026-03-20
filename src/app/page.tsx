@@ -34,6 +34,9 @@ export default function HomePage() {
             Platform lengkap untuk simulasi test dan pembelajaran TOEFL ITP. 
             Pilih mode yang sesuai dengan kebutuhan Anda.
           </p>
+          <p className="text-emerald-400 text-sm mt-4 font-medium">
+            oleh: Berani Tumbuh Indonesia
+          </p>
         </div>
 
         {/* Feature Cards */}
