@@ -12,14 +12,14 @@ export async function POST(req: NextRequest) {
 
     const supabase = createSupabaseServerClientSimple();
 
-    // Find user
+    // Find user by email (username field is used as email)
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('username', username)
+      .eq('email', username)
       .single();
 
-    if (error || !user || user.status !== 'active') {
+    if (error || !user) {
       return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
     }
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Set session
     await setSessionCookie({
       id: user.id,
-      username: user.username,
+      username: user.email,
       name: user.name,
       role: 'admin',
     });
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       success: true,
       user: {
         id: user.id,
-        username: user.username,
+        username: user.email,
         name: user.name,
         role: user.role,
       },
