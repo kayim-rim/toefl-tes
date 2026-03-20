@@ -18,9 +18,9 @@ export async function GET() {
       .from('users')
       .select(`
         id,
-        username,
+        email,
         name,
-        status,
+        role,
         created_at
       `)
       .eq('role', 'student')
@@ -60,9 +60,9 @@ export async function GET() {
     // Format response
     const formattedUsers = users?.map(u => ({
       id: u.id,
-      username: u.username,
+      username: u.email, // Use email as username
       name: u.name,
-      status: u.status,
+      status: 'active',
       createdAt: u.created_at,
       _count: {
         progress: progressCounts[u.id] || 0,
@@ -94,26 +94,25 @@ export async function POST(req: NextRequest) {
 
     const supabase = createSupabaseServerClientSimple();
 
-    // Check if username exists
+    // Check if email exists (using email field as username)
     const { data: existingUser } = await supabase
       .from('users')
       .select('id')
-      .eq('username', username)
+      .eq('email', username)
       .single();
 
     if (existingUser) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 400 });
     }
 
-    // Create user
+    // Create user (using email field as username)
     const { data: newUser, error } = await supabase
       .from('users')
       .insert({
-        username,
+        email: username, // Use email field for username
         password: hashPassword(password),
         name,
         role: 'student',
-        status: 'active',
       })
       .select()
       .single();
@@ -127,9 +126,9 @@ export async function POST(req: NextRequest) {
       success: true,
       user: {
         id: newUser.id,
-        username: newUser.username,
+        username: newUser.email,
         name: newUser.name,
-        status: newUser.status,
+        status: 'active',
       },
     });
   } catch (error) {
