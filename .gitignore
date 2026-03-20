@@ -43,7 +43,7 @@ local-*
 .claude
 .z-ai-config
 dev.log
-test
+/test
 prompt
 
 server.log
