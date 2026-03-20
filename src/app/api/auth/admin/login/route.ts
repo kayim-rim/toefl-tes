@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClientSimple } from '@/lib/supabase/server';
+import { createSupabaseServerClientSimple } from '@/lib/supabase';
 import { hashPassword } from '@/lib/auth';
 
 const SESSION_COOKIE = 'toefl_session';
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const { username, password } = await req.json();
 
     if (!username || !password) {
-      return NextResponse.json({ error: 'Username dan password diperlukan' }, { status: 400 });
+      return NextResponse.json({ error: 'Email dan password diperlukan' }, { status: 400 });
     }
 
     const supabase = createSupabaseServerClientSimple();
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     if (error || !user) {
       console.log('User not found:', error);
-      return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
+      return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
     }
 
     // Check if user is admin
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const hashedPassword = hashPassword(password);
     if (hashedPassword !== user.password) {
       console.log('Password mismatch');
-      return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
+      return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
     }
 
     // Create session data

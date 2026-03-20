@@ -1,5 +1,8 @@
 'use client';
 
+// Audio Player Component - Updated to use new naming convention
+// Format: /audio/package_{X}/p{X}_q{N}.wav
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw, Volume2, Loader2 } from 'lucide-react';
@@ -19,36 +22,13 @@ export function AudioPlayer({ questionId, part, packageId = 'A', autoPlay = fals
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Construct audio URL based on package, part and question ID
+  // Construct audio URL based on package and question ID
+  // New format: /audio/package_{X}/p{X}_q{N}.wav
+  // Example: /audio/package_A/pA_q1.wav, /audio/package_B/pB_q15.wav
   const getAudioUrl = () => {
-    // Package A uses old naming convention: listening_A_q{id}.wav and listening_B_q{id}.wav
-    // Package B uses new naming convention: package_B_part_{A/B/C}_q{id}.wav
-    
-    if (packageId === 'A') {
-      // Old naming convention for Package A
-      if (part === 'A') {
-        // Part A: questions 1-30, files: listening_A_q{1-30}.wav
-        return `/audio/listening_A_q${questionId}.wav`;
-      } else if (part === 'B') {
-        // Part B: questions 31-38, files: listening_B_q{1-8}.wav
-        const partBIndex = questionId - 30; // 31 -> 1, 32 -> 2, etc.
-        return `/audio/listening_B_q${partBIndex}.wav`;
-      } else {
-        // Part C: questions 39-50, files: listening_A_q{39-50}.wav
-        return `/audio/listening_A_q${questionId}.wav`;
-      }
-    } else {
-      // New naming convention for Package B, C, D
-      if (part === 'A') {
-        return `/audio/package_${packageId}_part_A_q${questionId}.wav`;
-      } else if (part === 'B') {
-        const partBIndex = questionId - 30;
-        return `/audio/package_${packageId}_part_B_q${partBIndex}.wav`;
-      } else {
-        const partCIndex = questionId - 38;
-        return `/audio/package_${packageId}_part_C_q${partCIndex}.wav`;
-      }
-    }
+    const folderName = `package_${packageId}`;
+    const fileName = `p${packageId}_q${questionId}`;
+    return `/audio/${folderName}/${fileName}.wav`;
   };
 
   const audioUrl = getAudioUrl();

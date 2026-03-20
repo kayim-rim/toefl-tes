@@ -62,8 +62,15 @@ export async function GET(
     
     ensureAudioDir();
     
-    const filename = `listening_${pkgId}_q${qId}.wav`;
-    const outputPath = join(AUDIO_DIR, filename);
+    // New naming format: package_A/pA_q1.wav
+    const packageDir = join(AUDIO_DIR, `package_${pkgId}`);
+    const filename = `p${pkgId}_q${qId}.wav`;
+    const outputPath = join(packageDir, filename);
+    
+    // Ensure package directory exists
+    if (!existsSync(packageDir)) {
+      mkdirSync(packageDir, { recursive: true });
+    }
     
     // Check if file already exists
     if (existsSync(outputPath)) {
@@ -71,7 +78,7 @@ export async function GET(
         const stats = statSync(outputPath);
         if (stats.size > 1000) {
           // File exists, redirect to static file
-          return NextResponse.redirect(new URL(`/audio/${filename}`, req.url));
+          return NextResponse.redirect(new URL(`/audio/package_${pkgId}/${filename}`, req.url));
         }
       } catch (e) {
         // Continue to generate
