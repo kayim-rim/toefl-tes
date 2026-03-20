@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,24 @@ import { packages } from '@/data/packages';
 
 export default function PackageSelectionContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
 
-  const name = searchParams.get('name') || '';
-  const institution = searchParams.get('institution') || '';
+  // Read from sessionStorage using useMemo
+  const userInfo = useMemo(() => {
+    if (typeof window === 'undefined') return { name: '', institution: '', hasName: false };
+    const name = sessionStorage.getItem('testName') || '';
+    const institution = sessionStorage.getItem('testInstitution') || '';
+    return { name, institution, hasName: !!name };
+  }, []);
+
+  const name = userInfo.name;
+  const institution = userInfo.institution;
+
+  // If no name, redirect back to registration
+  if (!userInfo.hasName && typeof window !== 'undefined') {
+    // Use setTimeout to avoid setState during render
+    setTimeout(() => router.push('/test'), 0);
+  }
 
   const handleSelectPackage = (packageId: string) => {
     setSelectedPackage(packageId);
@@ -22,9 +35,7 @@ export default function PackageSelectionContent() {
 
   const handleStartTest = () => {
     if (selectedPackage) {
-      // Navigate to exam page with package and user info
-      sessionStorage.setItem('testName', name);
-      sessionStorage.setItem('testInstitution', institution);
+      // Save selected package to sessionStorage
       sessionStorage.setItem('testPackage', selectedPackage);
       router.push('/test/exam');
     }

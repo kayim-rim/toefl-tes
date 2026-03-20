@@ -28,6 +28,8 @@ export default function TestRegistrationPage() {
     setIsLoading(true);
 
     // Save to sessionStorage for the test flow
+    sessionStorage.setItem('testName', name);
+    sessionStorage.setItem('testInstitution', institution);
     sessionStorage.setItem('testUser', JSON.stringify({ name, institution }));
 
     // Navigate to package selection
