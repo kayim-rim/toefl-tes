@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClientSimple } from '@/lib/supabase';
-import { hashPassword, verifyPassword, setSessionCookie } from '@/lib/auth';
+import { createSupabaseServerClientSimple } from '@/lib/supabase/server';
+import { hashPassword } from '@/lib/auth';
+
+const SESSION_COOKIE = 'toefl_session';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,14 +14,14 @@ export async function POST(req: NextRequest) {
 
     const supabase = createSupabaseServerClientSimple();
 
-    // Find user
+    // Find user by email (username field is used as email)
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('username', username)
+      .eq('email', username)
       .single();
 
-    if (error || !user || user.status !== 'active') {
+    if (error || !user) {
       return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
     }
 
@@ -29,27 +31,43 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify password
-    if (!verifyPassword(password, user.password || '')) {
+    const hashedPassword = hashPassword(password);
+    if (hashedPassword !== user.password) {
       return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
     }
 
-    // Set session
-    await setSessionCookie({
+    // Create session data
+    const sessionUser = {
       id: user.id,
-      username: user.username,
+      username: user.email,
       name: user.name,
       role: user.role as 'student' | 'admin',
-    });
+    };
 
-    return NextResponse.json({
+    // Encode session
+    const sessionData = Buffer.from(JSON.stringify(sessionUser)).toString('base64');
+
+    // Create response with cookie
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
-        username: user.username,
+        username: user.email,
         name: user.name,
         role: user.role,
       },
     });
+
+    // Set cookie manually in response
+    response.cookies.set(SESSION_COOKIE, sessionData, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60, // 24 hours
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
