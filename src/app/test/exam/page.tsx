@@ -251,6 +251,7 @@ export default function ExamPage() {
             <AudioPlayer 
               questionId={(currentQuestion as ListeningQuestion)?.id || 1}
               part={(currentQuestion as ListeningQuestion)?.part || 'A'}
+              packageId={packageData?.id || 'A'}
             />
           </div>
         )}

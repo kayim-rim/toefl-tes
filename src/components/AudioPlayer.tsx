@@ -7,10 +7,11 @@ import { Play, Pause, RotateCcw, Volume2, Loader2 } from 'lucide-react';
 interface AudioPlayerProps {
   questionId: number;
   part: 'A' | 'B' | 'C';
+  packageId?: string;
   autoPlay?: boolean;
 }
 
-export function AudioPlayer({ questionId, part, autoPlay = false }: AudioPlayerProps) {
+export function AudioPlayer({ questionId, part, packageId = 'A', autoPlay = false }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,21 +19,35 @@ export function AudioPlayer({ questionId, part, autoPlay = false }: AudioPlayerP
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Construct audio URL based on part and question ID
+  // Construct audio URL based on package, part and question ID
   const getAudioUrl = () => {
-    // Part A: questions 1-30, audio files: listening_A_q{id}.wav
-    // Part B: questions 31-38, but audio uses B prefix with 1-based index within part
-    // Part C: questions 39-50, but audio uses B prefix with 1-based index within part
+    // Package A uses old naming convention: listening_A_q{id}.wav and listening_B_q{id}.wav
+    // Package B uses new naming convention: package_B_part_{A/B/C}_q{id}.wav
     
-    if (part === 'A') {
-      return `/audio/listening_A_q${questionId}.wav`;
-    } else if (part === 'B') {
-      // Part B has questions 31-38, but audio files are listening_B_q1, listening_B_q2, etc.
-      const partBIndex = questionId - 30; // 31 -> 1, 32 -> 2, etc.
-      return `/audio/listening_B_q${partBIndex}.wav`;
+    if (packageId === 'A') {
+      // Old naming convention for Package A
+      if (part === 'A') {
+        // Part A: questions 1-30, files: listening_A_q{1-30}.wav
+        return `/audio/listening_A_q${questionId}.wav`;
+      } else if (part === 'B') {
+        // Part B: questions 31-38, files: listening_B_q{1-8}.wav
+        const partBIndex = questionId - 30; // 31 -> 1, 32 -> 2, etc.
+        return `/audio/listening_B_q${partBIndex}.wav`;
+      } else {
+        // Part C: questions 39-50, files: listening_A_q{39-50}.wav
+        return `/audio/listening_A_q${questionId}.wav`;
+      }
     } else {
-      // Part C: For now try the A prefix files
-      return `/audio/listening_A_q${questionId}.wav`;
+      // New naming convention for Package B, C, D
+      if (part === 'A') {
+        return `/audio/package_${packageId}_part_A_q${questionId}.wav`;
+      } else if (part === 'B') {
+        const partBIndex = questionId - 30;
+        return `/audio/package_${packageId}_part_B_q${partBIndex}.wav`;
+      } else {
+        const partCIndex = questionId - 38;
+        return `/audio/package_${packageId}_part_C_q${partCIndex}.wav`;
+      }
     }
   };
 
@@ -178,7 +193,7 @@ export function AudioPlayer({ questionId, part, autoPlay = false }: AudioPlayerP
       {/* Audio Label */}
       <div className="mt-2 text-xs text-slate-400 flex items-center gap-2">
         <Volume2 className="w-3 h-3" />
-        <span>Listening Part {part} - Question {questionId}</span>
+        <span>Package {packageId} - Listening Part {part} - Question {questionId}</span>
       </div>
     </div>
   );
