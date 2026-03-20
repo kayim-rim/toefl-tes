@@ -1,0 +1,202 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  password      String   // hashed
+  name          String
+  role          String   @default("student") // "student" or "admin"
+  status        String   @default("active")  // "active" or "inactive"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  progress      UserProgress[]
+  bookmarks     Bookmark[]
+  notes         Note[]
+  testResults   TestResult[]
+  certificate   Certificate?
+  learningActivities LearningActivity[]
+}
+
+// ============================================
+// LEARNING CONTENT
+// ============================================
+
+model LearningSkill {
+  id            String   @id @default(cuid())
+  section       String   // "listening", "structure", "reading"
+  skillId       String   // "1.1", "1.2", ..., "2.1", etc.
+  name          String   // "Understanding Main Idea"
+  description   String
+  objectives    String   // JSON array
+  material      String   // Markdown content
+  tips          String   // JSON array
+  order         Int      // 1, 2, 3...
+  
+  questions     LearningQuestion[]
+  progress      UserProgress[]
+  
+  @@unique([section, skillId])
+}
+
+model LearningQuestion {
+  id            String   @id @default(cuid())
+  skillId       String
+  skill         LearningSkill @relation(fields: [skillId], references: [id])
+  
+  order         Int      // 1-10
+  question      String
+  options       String   // JSON array ["A", "B", "C", "D"]
+  correctAnswer Int      // 0-3
+  
+  // For listening questions
+  audioScript   String?
+  
+  // Explanation content
+  explanation   String
+  whyCorrect    String   // Why correct answer is right
+  whyWrong      String?  // Why wrong answers are wrong
+  
+  createdAt     DateTime @default(now())
+  
+  @@unique([skillId, order])
+}
+
+// ============================================
+// USER PROGRESS & ACTIVITIES
+// ============================================
+
+model UserProgress {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  skillId       String
+  skill         LearningSkill @relation(fields: [skillId], references: [id])
+  
+  answered      Int      @default(0)  // Questions answered (0-10)
+  correct       Int      @default(0)  // Correct answers
+  score         Int      @default(0)  // Percentage (0-100)
+  completed     Boolean  @default(false)
+  
+  lastQuestion  Int      @default(0)  // Last question attempted
+  
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([userId, skillId])
+}
+
+model LearningActivity {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  activityType  String   // "answer", "bookmark", "note", "complete"
+  skillId       String?
+  questionId    String?
+  data          String?  // JSON for additional data
+  
+  createdAt     DateTime @default(now())
+}
+
+// ============================================
+// BOOKMARKS & NOTES
+// ============================================
+
+model Bookmark {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  section       String   // "listening", "structure", "reading"
+  skillId       String   // "1.1", "2.3", etc.
+  questionOrder Int?     // Question number (optional)
+  
+  note          String?
+  createdAt     DateTime @default(now())
+}
+
+model Note {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  section       String
+  skillId       String
+  title         String
+  content       String
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============================================
+// TEST RESULTS
+// ============================================
+
+model TestResult {
+  id            String   @id @default(cuid())
+  
+  // For test simulation (without login) - kept for backward compatibility
+  name          String
+  origin        String
+  
+  // For logged-in users
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  
+  packageName   String   // A, B, C, D
+  
+  // Raw scores
+  listeningRaw  Int      @default(0)
+  structureRaw  Int      @default(0)
+  readingRaw    Int      @default(0)
+  
+  // Scaled scores
+  listeningScore  Int    @default(0)
+  structureScore  Int    @default(0)
+  readingScore    Int    @default(0)
+  totalScore      Int    @default(0)
+  
+  timeSpent     Int      @default(0)  // seconds
+  
+  // Detailed answers
+  answers       String   // JSON object
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============================================
+// CERTIFICATE
+// ============================================
+
+model Certificate {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  
+  score         Int      // 0-100
+  certificateId String   @unique // TOEFL-2024-XXXXX
+  
+  listeningAvg  Int
+  structureAvg  Int
+  readingAvg    Int
+  
+  issuedAt      DateTime @default(now())
+}
