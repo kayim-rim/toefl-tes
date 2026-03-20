@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, Clock, Headphones, PenTool, BookOpen, Send, AlertCircle } from 'lucide-react';
 import { packages, calculateScores, ListeningQuestion, StructureQuestion, ReadingPassage } from '@/data/packages';
+import { AudioPlayer } from '@/components/AudioPlayer';
 
 type Section = 'listening' | 'structure' | 'reading';
 
@@ -243,6 +244,16 @@ export default function ExamPage() {
         <div className="mb-4 text-sm text-slate-400">
           Question {currentQuestionIndex + 1} of {questions.length}
         </div>
+
+        {/* Audio Player for Listening Section */}
+        {currentSection === 'listening' && (
+          <div className="mb-6">
+            <AudioPlayer 
+              questionId={(currentQuestion as ListeningQuestion)?.id || 1}
+              part={(currentQuestion as ListeningQuestion)?.part || 'A'}
+            />
+          </div>
+        )}
 
         {/* Listening Conversation/Talk Text */}
         {currentSection === 'listening' && (currentQuestion as ListeningQuestion)?.conversation && (
