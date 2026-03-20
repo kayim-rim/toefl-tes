@@ -18,9 +18,6 @@ export const metadata: Metadata = {
   description: "Free online TOEFL ITP simulation test with listening comprehension, structure & written expression, and reading comprehension sections. Practice and improve your English proficiency.",
   keywords: ["TOEFL", "TOEFL ITP", "English Test", "Practice Test", "Simulation", "Listening", "Reading", "Structure"],
   authors: [{ name: "TOEFL Simulation" }],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
   openGraph: {
     title: "TOEFL ITP Simulation Test",
     description: "Free online TOEFL ITP simulation test with realistic questions and scoring",
