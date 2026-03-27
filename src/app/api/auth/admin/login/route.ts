@@ -1,15 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClientSimple } from '@/lib/supabase';
-import { hashPassword } from '@/lib/auth';
-
-const SESSION_COOKIE = 'toefl_session';
+import { verifyPassword, setSessionCookie } from '@/lib/auth';
+import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password } = await req.json();
+    // Rate limiting check
+    const clientId = getClientIdentifier(req);
+    const rateLimit = checkRateLimit(`admin-login:${clientId}`, RATE_LIMITS.LOGIN);
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Email dan password diperlukan' }, { status: 400 });
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.',
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000)
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimit.resetTime - Date.now()) / 1000)),
+            'X-RateLimit-Remaining': '0',
+          }
+        }
+      );
+    }
+
+    const body = await req.json();
+    const { username, password } = body;
+
+    // Input validation
+    if (!username || typeof username !== 'string' || username.trim().length === 0) {
+      return NextResponse.json({ error: 'Email diperlukan' }, { status: 400 });
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 1) {
+      return NextResponse.json({ error: 'Password diperlukan' }, { status: 400 });
     }
 
     const supabase = createSupabaseServerClientSimple();
@@ -17,12 +42,11 @@ export async function POST(req: NextRequest) {
     // Find user by email (username field is used as email)
     const { data: user, error } = await supabase
       .from('users')
-      .select('*')
-      .eq('email', username)
+      .select('id, email, name, role, password')
+      .eq('email', username.trim().toLowerCase())
       .single();
 
     if (error || !user) {
-      console.log('User not found:', error);
       return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
     }
 
@@ -31,26 +55,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Akses ditolak. Halaman ini untuk admin saja.' }, { status: 403 });
     }
 
-    // Verify password
-    const hashedPassword = hashPassword(password);
-    if (hashedPassword !== user.password) {
-      console.log('Password mismatch');
+    // Verify password using secure comparison
+    if (!verifyPassword(password, user.password)) {
       return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
     }
 
-    // Create session data
-    const sessionUser = {
+    // Create secure session using the new signed cookie system
+    await setSessionCookie({
       id: user.id,
       username: user.email,
       name: user.name,
-      role: 'admin' as const,
-    };
+      role: 'admin',
+    });
 
-    // Encode session
-    const sessionData = Buffer.from(JSON.stringify(sessionUser)).toString('base64');
-
-    // Create response with cookie
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -59,17 +77,6 @@ export async function POST(req: NextRequest) {
         role: user.role,
       },
     });
-
-    // Set cookie manually in response
-    response.cookies.set(SESSION_COOKIE, sessionData, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60, // 24 hours
-      path: '/',
-    });
-
-    return response;
   } catch (error) {
     console.error('Admin login error:', error);
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
