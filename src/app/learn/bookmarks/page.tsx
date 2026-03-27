@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Bookmark, Loader2, Trash2 } from 'lucide-react';
+import { useLearningAccess } from '@/hooks/useLearningAccess';
 
 interface BookmarkData {
   id: string;
@@ -16,27 +16,15 @@ interface BookmarkData {
 }
 
 export default function BookmarksPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: isLoadingAuth, hasAccess } = useLearningAccess();
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-    fetchBookmarks();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        router.push('/login');
-      }
-    } catch (err) {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
+    if (hasAccess) {
+      fetchBookmarks();
     }
-  };
+  }, [hasAccess]);
 
   const fetchBookmarks = async () => {
     try {
@@ -47,15 +35,21 @@ export default function BookmarksPage() {
       }
     } catch (err) {
       console.error('Failed to fetch bookmarks:', err);
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
       </div>
     );
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect via hook
   }
 
   return (

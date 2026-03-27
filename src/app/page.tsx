@@ -1,10 +1,73 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, BookOpen, Settings, ArrowRight, Headphones, PenTool, Trophy, Crown, GraduationCap, CheckCircle, UserPlus, LogIn } from 'lucide-react';
+import { FileText, BookOpen, Settings, ArrowRight, Headphones, PenTool, Trophy, Crown, GraduationCap, CheckCircle, UserPlus, LogIn, LogOut, User, Loader2 } from 'lucide-react';
+
+// Tier type
+type UserTier = 'free' | 'tes' | 'student';
+
+// Tier display info
+const TIER_INFO: Record<UserTier, { name: string; color: string; icon: React.ReactNode }> = {
+  free: { name: 'Gratis', color: 'bg-slate-500', icon: null },
+  tes: { name: 'Tes', color: 'bg-blue-500', icon: <Crown className="w-3 h-3" /> },
+  student: { name: 'Student', color: 'bg-emerald-500', icon: <GraduationCap className="w-3 h-3" /> }
+};
+
+interface UserData {
+  id: string;
+  username: string;
+  name: string;
+  role: string;
+  tier: UserTier;
+  tierExpiresAt: string | null;
+}
 
 export default function HomePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Check if tier is active
+  const isTierActive = (tier: UserTier, expiresAt: string | null): boolean => {
+    if (tier === 'free') return true;
+    if (!expiresAt) return true;
+    return new Date(expiresAt) > new Date();
+  };
+
+  const effectiveTier = user ? (isTierActive(user.tier, user.tierExpiresAt) ? user.tier : 'free') : 'free';
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setUser(null);
+      router.refresh();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
       {/* Header */}
@@ -19,19 +82,46 @@ export default function HomePage() {
               <p className="text-xs text-slate-400">Simulasi & Pembelajaran</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="text-slate-400 hover:text-white">
-              <Link href="/login">
-                <LogIn className="w-4 h-4 mr-2" />
-                Login
-              </Link>
-            </Button>
-            <Button asChild className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
-              <Link href="/register">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Daftar
-              </Link>
-            </Button>
+          
+          {/* User Info Area */}
+          <div className="flex items-center gap-3">
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            ) : user ? (
+              <>
+                <div className="hidden sm:flex items-center gap-2">
+                  <User className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm text-white">{user.name}</span>
+                  <Badge className={`${TIER_INFO[effectiveTier].color} text-white text-xs`}>
+                    {TIER_INFO[effectiveTier].icon}
+                    <span className="ml-1">{TIER_INFO[effectiveTier].name}</span>
+                  </Badge>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  onClick={handleLogout}
+                  className="text-slate-400 hover:text-white hover:bg-slate-700"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="ghost" className="text-slate-400 hover:text-white">
+                  <Link href="/login">
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Login
+                  </Link>
+                </Button>
+                <Button asChild className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
+                  <Link href="/register">
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Daftar
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -51,6 +141,26 @@ export default function HomePage() {
             oleh: Berani Tumbuh Indonesia
           </p>
         </div>
+
+        {/* Welcome Banner for logged in users */}
+        {user && (
+          <div className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg max-w-2xl mx-auto">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-medium">Selamat datang kembali, {user.name}!</h3>
+                <p className="text-slate-400 text-sm">
+                  Tier: <span className="text-emerald-400">{TIER_INFO[effectiveTier].name}</span>
+                  {effectiveTier !== 'student' && (
+                    <span> • <Link href="/pricing" className="text-blue-400 hover:text-blue-300">Upgrade untuk akses penuh</Link></span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Feature Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -88,43 +198,45 @@ export default function HomePage() {
             </Link>
           </Card>
 
-          {/* Daftar Akun Card - NEW */}
-          <Card className="bg-slate-800/80 border-slate-700 hover:border-emerald-500/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
-            <Link href="/register">
-              <CardHeader className="text-center pb-2">
-                <div className="mx-auto w-14 h-14 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <UserPlus className="w-7 h-7 text-white" />
-                </div>
-                <CardTitle className="text-lg text-white">Daftar Akun</CardTitle>
-                <CardDescription className="text-slate-400 text-sm">
-                  Buat akun untuk akses penuh
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-slate-300">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <span>Semua paket soal</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <span>Progress tersimpan</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <span>History & Analytics</span>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
-                  Daftar Gratis <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </CardFooter>
-            </Link>
-          </Card>
+          {/* Daftar Akun Card - Only show if not logged in */}
+          {!user && (
+            <Card className="bg-slate-800/80 border-slate-700 hover:border-emerald-500/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
+              <Link href="/register">
+                <CardHeader className="text-center pb-2">
+                  <div className="mx-auto w-14 h-14 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <UserPlus className="w-7 h-7 text-white" />
+                  </div>
+                  <CardTitle className="text-lg text-white">Daftar Akun</CardTitle>
+                  <CardDescription className="text-slate-400 text-sm">
+                    Buat akun untuk akses penuh
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span>Semua paket soal</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span>Progress tersimpan</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span>History & Analytics</span>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
+                    Daftar Gratis <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </CardFooter>
+              </Link>
+            </Card>
+          )}
 
           {/* Pembelajaran Card */}
           <Card className="bg-slate-800/80 border-slate-700 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
-            <Link href="/login">
+            <Link href="/learn">
               <CardHeader className="text-center pb-2">
                 <div className="mx-auto w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <BookOpen className="w-7 h-7 text-white" />
@@ -257,10 +369,17 @@ export default function HomePage() {
             </Card>
 
             {/* Tes */}
-            <Card className="bg-slate-800/50 border-slate-700 ring-2 ring-blue-500 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <Badge className="bg-blue-500 text-white">Paling Populer</Badge>
-              </div>
+            <Card className={`bg-slate-800/50 border-slate-700 relative ${effectiveTier === 'tes' ? 'ring-2 ring-blue-500' : ''}`}>
+              {effectiveTier !== 'tes' && effectiveTier !== 'student' && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-blue-500 text-white">Paling Populer</Badge>
+                </div>
+              )}
+              {effectiveTier === 'tes' && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-emerald-500 text-white">Paket Anda</Badge>
+                </div>
+              )}
               <CardHeader className="text-center pb-2">
                 <CardTitle className="text-lg text-white flex items-center justify-center gap-2">
                   <Crown className="w-4 h-4 text-blue-400" />
@@ -284,14 +403,25 @@ export default function HomePage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button asChild className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600">
-                  <Link href="/pricing">Pilih Paket</Link>
-                </Button>
+                {effectiveTier === 'tes' || effectiveTier === 'student' ? (
+                  <Button disabled className="w-full bg-slate-600 text-slate-300">
+                    Sudah Berlangganan
+                  </Button>
+                ) : (
+                  <Button asChild className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600">
+                    <Link href="/pricing">Pilih Paket</Link>
+                  </Button>
+                )}
               </CardFooter>
             </Card>
 
             {/* Student */}
-            <Card className="bg-slate-800/50 border-slate-700">
+            <Card className={`bg-slate-800/50 border-slate-700 ${effectiveTier === 'student' ? 'ring-2 ring-emerald-500' : ''}`}>
+              {effectiveTier === 'student' && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-emerald-500 text-white">Paket Anda</Badge>
+                </div>
+              )}
               <CardHeader className="text-center pb-2">
                 <CardTitle className="text-lg text-white flex items-center justify-center gap-2">
                   <GraduationCap className="w-4 h-4 text-emerald-400" />
@@ -315,9 +445,15 @@ export default function HomePage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button asChild className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
-                  <Link href="/pricing">Pilih Paket</Link>
-                </Button>
+                {effectiveTier === 'student' ? (
+                  <Button disabled className="w-full bg-slate-600 text-slate-300">
+                    Sudah Berlangganan
+                  </Button>
+                ) : (
+                  <Button asChild className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
+                    <Link href="/pricing">Pilih Paket</Link>
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           </div>

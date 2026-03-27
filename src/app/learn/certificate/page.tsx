@@ -1,15 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { 
   ArrowLeft, Award, Loader2, Download, CheckCircle, AlertCircle
 } from 'lucide-react';
+import { useLearningAccess } from '@/hooks/useLearningAccess';
 
 interface CertificateData {
   id: string;
@@ -29,28 +28,16 @@ interface ProgressSummary {
 }
 
 export default function CertificatePage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: isLoadingAuth, hasAccess, user } = useLearningAccess();
   const [certificate, setCertificate] = useState<CertificateData>(null);
   const [progress, setProgress] = useState<ProgressSummary | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-    fetchData();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        router.push('/login');
-      }
-    } catch (err) {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
+    if (hasAccess) {
+      fetchData();
     }
-  };
+  }, [hasAccess]);
 
   const fetchData = async () => {
     try {
@@ -69,6 +56,8 @@ export default function CertificatePage() {
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -91,12 +80,16 @@ export default function CertificatePage() {
     alert('Fitur download sertifikat akan segera tersedia!');
   };
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
       </div>
     );
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect via hook
   }
 
   return (
@@ -137,7 +130,7 @@ export default function CertificatePage() {
                     <p className="text-slate-400 mb-8">TOEFL ITP Learning Program</p>
                     
                     <p className="text-slate-300 mb-2">This is to certify that</p>
-                    <p className="text-2xl font-bold text-white mb-4">{/* User Name */}</p>
+                    <p className="text-2xl font-bold text-white mb-4">{user?.name || 'Student'}</p>
                     
                     <p className="text-slate-300 mb-6">
                       has successfully completed the TOEFL ITP Learning Program

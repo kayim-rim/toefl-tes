@@ -1,20 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, CheckCircle, XCircle,
   Lightbulb, Target, BookOpen, Loader2, Bookmark, BookmarkCheck
 } from 'lucide-react';
-import { getSkillById, allLearningSkills } from '@/data/learning/skills';
+import { getSkillById } from '@/data/learning/skills';
+import { useLearningAccess } from '@/hooks/useLearningAccess';
 
 interface Question {
   id: number;
@@ -28,11 +28,10 @@ interface Question {
 }
 
 export default function SkillLearningPage() {
-  const router = useRouter();
   const params = useParams();
   const skillId = params.skillId as string;
 
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: isLoadingAuth, hasAccess } = useLearningAccess();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -43,23 +42,6 @@ export default function SkillLearningPage() {
 
   // Generate questions for this skill (in real app, these would come from database)
   const questions: Question[] = generateQuestions(skillId);
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        router.push('/login');
-      }
-    } catch (err) {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAnswer = async (answerIndex: number) => {
     if (selectedAnswer !== null) return;
@@ -120,10 +102,29 @@ export default function SkillLearningPage() {
     }
   };
 
-  if (isLoading || !skill) {
+  if (isLoadingAuth) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect via hook
+  }
+
+  if (!skill) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Skill tidak ditemukan</h1>
+          <Link href="/learn">
+            <Button variant="outline" className="border-slate-600 text-slate-300">
+              Kembali ke Learning Center
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }

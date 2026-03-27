@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useLearningAccess } from '@/hooks/useLearningAccess';
 
 interface NoteData {
   id: string;
@@ -19,29 +19,17 @@ interface NoteData {
 }
 
 export default function NotesPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: isLoadingAuth, hasAccess } = useLearningAccess();
   const [notes, setNotes] = useState<NoteData[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '', skillId: '' });
 
   useEffect(() => {
-    checkAuth();
-    fetchNotes();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        router.push('/login');
-      }
-    } catch (err) {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
+    if (hasAccess) {
+      fetchNotes();
     }
-  };
+  }, [hasAccess]);
 
   const fetchNotes = async () => {
     try {
@@ -52,15 +40,21 @@ export default function NotesPage() {
       }
     } catch (err) {
       console.error('Failed to fetch notes:', err);
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
       </div>
     );
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect via hook
   }
 
   return (

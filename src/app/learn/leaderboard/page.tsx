@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Trophy, Medal, Loader2, Crown, TrendingUp } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Trophy, Loader2, Crown, Medal, TrendingUp } from 'lucide-react';
+import { useLearningAccess } from '@/hooks/useLearningAccess';
 
 interface LeaderboardEntry {
   id: string;
@@ -21,28 +19,16 @@ interface LeaderboardEntry {
 }
 
 export default function LeaderboardPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: isLoadingAuth, hasAccess } = useLearningAccess();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [timeRange, setTimeRange] = useState('all');
 
   useEffect(() => {
-    checkAuth();
-    fetchLeaderboard();
-  }, [timeRange]);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        router.push('/login');
-      }
-    } catch (err) {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
+    if (hasAccess) {
+      fetchLeaderboard();
     }
-  };
+  }, [hasAccess, timeRange]);
 
   const fetchLeaderboard = async () => {
     try {
@@ -53,6 +39,8 @@ export default function LeaderboardPage() {
       }
     } catch (err) {
       console.error('Failed to fetch leaderboard:', err);
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -70,12 +58,16 @@ export default function LeaderboardPage() {
     return 'bg-slate-700/50 border-slate-600';
   };
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
       </div>
     );
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect via hook
   }
 
   return (

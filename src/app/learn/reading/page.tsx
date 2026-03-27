@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, BookOpen, ChevronRight, CheckCircle, Circle, PlayCircle, Loader2 } from 'lucide-react';
 import { readingSkills } from '@/data/learning/skills';
+import { useLearningAccess } from '@/hooks/useLearningAccess';
 
 interface ProgressData {
   [skillId: string]: {
@@ -18,27 +18,15 @@ interface ProgressData {
 }
 
 export default function ReadingSectionPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: isLoadingAuth, hasAccess } = useLearningAccess();
   const [progress, setProgress] = useState<ProgressData>({});
+  const [isLoadingProgress, setIsLoadingProgress] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-    fetchProgress();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        router.push('/login');
-      }
-    } catch (err) {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
+    if (hasAccess) {
+      fetchProgress();
     }
-  };
+  }, [hasAccess]);
 
   const fetchProgress = async () => {
     try {
@@ -49,15 +37,21 @@ export default function ReadingSectionPage() {
       }
     } catch (err) {
       console.error('Failed to fetch progress:', err);
+    } finally {
+      setIsLoadingProgress(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingProgress) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
       </div>
     );
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect via hook
   }
 
   return (
