@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, BookOpen, Settings, ArrowRight, Headphones, PenTool, Trophy } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { FileText, BookOpen, Settings, ArrowRight, Headphones, PenTool, Trophy, Crown, GraduationCap, CheckCircle } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -174,6 +175,109 @@ export default function HomePage() {
               <div className="text-3xl font-bold text-emerald-400 mb-1">280+</div>
               <div className="text-sm text-slate-400">Soal Latihan</div>
             </div>
+          </div>
+        </div>
+
+        {/* Pricing Section */}
+        <div className="mt-16 max-w-4xl mx-auto">
+          <h3 className="text-2xl font-bold text-white text-center mb-2">Pilih Paket</h3>
+          <p className="text-slate-400 text-center mb-8">Mulai gratis, upgrade kapan saja</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Free */}
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardHeader className="text-center pb-2">
+                <CardTitle className="text-lg text-white">Gratis</CardTitle>
+                <div className="text-2xl font-bold text-white">Rp 0</div>
+                <CardDescription className="text-slate-400">Seumur hidup</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-300 space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Paket A & B</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>140+ soal latihan</span>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button asChild className="w-full bg-slate-700 hover:bg-slate-600">
+                  <Link href="/test">Mulai Gratis</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Tes */}
+            <Card className="bg-slate-800/50 border-slate-700 ring-2 ring-blue-500 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <Badge className="bg-blue-500 text-white">Paling Populer</Badge>
+              </div>
+              <CardHeader className="text-center pb-2">
+                <CardTitle className="text-lg text-white flex items-center justify-center gap-2">
+                  <Crown className="w-4 h-4 text-blue-400" />
+                  Paket Tes
+                </CardTitle>
+                <div className="text-2xl font-bold text-white">Rp 10.000</div>
+                <CardDescription className="text-slate-400">per tahun</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-300 space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-blue-400" />
+                  <span>Semua paket soal</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-blue-400" />
+                  <span>Pembahasan lengkap</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-blue-400" />
+                  <span>History & Sertifikat</span>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button asChild className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600">
+                  <Link href="/pricing">Pilih Paket</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Student */}
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardHeader className="text-center pb-2">
+                <CardTitle className="text-lg text-white flex items-center justify-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-emerald-400" />
+                  Paket Student
+                </CardTitle>
+                <div className="text-2xl font-bold text-white">Rp 25.000</div>
+                <CardDescription className="text-slate-400">per tahun</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-300 space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Semua fitur Tes</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Learning Class</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Progress tracking</span>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button asChild className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
+                  <Link href="/pricing">Pilih Paket</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          <div className="text-center mt-6">
+            <Link href="/pricing" className="text-emerald-400 hover:text-emerald-300 text-sm">
+              Lihat perbandingan lengkap →
+            </Link>
           </div>
         </div>
       </main>

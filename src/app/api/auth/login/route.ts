@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     // Find user by email (username field is used as email)
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, name, role, password')
+      .select('id, email, name, role, password, tier, tier_expires_at')
       .eq('email', username.trim().toLowerCase())
       .single();
 
@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
       username: user.email,
       name: user.name,
       role: user.role as 'student' | 'admin',
+      tier: (user.tier || 'free') as 'free' | 'tes' | 'student',
+      tierExpiresAt: user.tier_expires_at,
     });
 
     return NextResponse.json({
@@ -76,6 +78,8 @@ export async function POST(req: NextRequest) {
         username: user.email,
         name: user.name,
         role: user.role,
+        tier: user.tier || 'free',
+        tierExpiresAt: user.tier_expires_at,
       },
     });
   } catch (error) {

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     // Find user by email (username field is used as email)
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, name, role, password')
+      .select('id, email, name, role, password, tier, tier_expires_at')
       .eq('email', username.trim().toLowerCase())
       .single();
 
@@ -62,11 +62,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Create secure session using the new signed cookie system
+    // Admin gets full access (student tier equivalent)
     await setSessionCookie({
       id: user.id,
       username: user.email,
       name: user.name,
       role: 'admin',
+      tier: 'student', // Admin has full access
+      tierExpiresAt: null, // Never expires for admin
     });
 
     return NextResponse.json({

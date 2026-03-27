@@ -9,16 +9,44 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   ArrowLeft, Users, Plus, Loader2, Trash2, Edit, Power, PowerOff,
-  Search, UserCog, Home
+  Search, UserCog, Home, Crown, GraduationCap, Calendar
 } from 'lucide-react';
+
+// User tier type
+type UserTier = 'free' | 'tes' | 'student';
+
+// Tier display info
+const TIER_INFO: Record<UserTier, { name: string; color: string; bgColor: string; price: number }> = {
+  free: { name: 'Gratis', color: 'text-slate-300', bgColor: 'bg-slate-500/20', price: 0 },
+  tes: { name: 'Tes', color: 'text-blue-300', bgColor: 'bg-blue-500/20', price: 10000 },
+  student: { name: 'Student', color: 'text-emerald-300', bgColor: 'bg-emerald-500/20', price: 25000 }
+};
 
 interface User {
   id: string;
   username: string;
   name: string;
+  email: string | null;
   status: string;
+  tier: UserTier;
+  tierExpiresAt: string | null;
   createdAt: string;
   _count: {
     progress: number;
@@ -31,8 +59,14 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ username: '', password: '', name: '' });
+  const [formData, setFormData] = useState({ username: '', password: '', name: '', tier: 'free' as UserTier });
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Tier upgrade dialog
+  const [showTierDialog, setShowTierDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [newTier, setNewTier] = useState<UserTier>('free');
+  const [isUpdatingTier, setIsUpdatingTier] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -64,7 +98,7 @@ export default function AdminUsersPage() {
       });
 
       if (response.ok) {
-        setFormData({ username: '', password: '', name: '' });
+        setFormData({ username: '', password: '', name: '', tier: 'free' });
         setShowForm(false);
         fetchUsers();
       } else {
@@ -81,8 +115,8 @@ export default function AdminUsersPage() {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: currentStatus === 'active' ? 'inactive' : 'active' 
+        body: JSON.stringify({
+          status: currentStatus === 'active' ? 'inactive' : 'active'
         }),
       });
 
@@ -96,7 +130,7 @@ export default function AdminUsersPage() {
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Yakin ingin menghapus user ini?')) return;
-    
+
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
@@ -110,10 +144,56 @@ export default function AdminUsersPage() {
     }
   };
 
-  const filteredUsers = users.filter(u => 
+  const openTierDialog = (user: User) => {
+    setSelectedUser(user);
+    setNewTier(user.tier);
+    setShowTierDialog(true);
+  };
+
+  const handleUpdateTier = async () => {
+    if (!selectedUser) return;
+    setIsUpdatingTier(true);
+
+    try {
+      // Calculate expiry date (1 year from now for non-free tiers)
+      const expiresAt = newTier !== 'free'
+        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tier: newTier,
+          tierExpiresAt: expiresAt
+        }),
+      });
+
+      if (response.ok) {
+        setShowTierDialog(false);
+        fetchUsers();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Gagal mengupdate tier');
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan');
+    } finally {
+      setIsUpdatingTier(false);
+    }
+  };
+
+  const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Calculate tier statistics
+  const tierStats = {
+    free: users.filter(u => u.tier === 'free').length,
+    tes: users.filter(u => u.tier === 'tes').length,
+    student: users.filter(u => u.tier === 'student').length,
+  };
 
   if (isLoading) {
     return (
@@ -147,7 +227,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
           </div>
-          <Button 
+          <Button
             onClick={() => setShowForm(!showForm)}
             className="bg-gradient-to-r from-amber-500 to-orange-500"
           >
@@ -157,6 +237,54 @@ export default function AdminUsersPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Tier Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-slate-800/80 border-slate-700">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">Total Users</p>
+                  <p className="text-2xl font-bold text-white">{users.length}</p>
+                </div>
+                <Users className="w-8 h-8 text-slate-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-800/80 border-slate-700">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">Free</p>
+                  <p className="text-2xl font-bold text-slate-300">{tierStats.free}</p>
+                </div>
+                <Badge className="bg-slate-500/20 text-slate-300">Gratis</Badge>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-800/80 border-slate-700">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">Tes</p>
+                  <p className="text-2xl font-bold text-blue-300">{tierStats.tes}</p>
+                </div>
+                <Crown className="w-8 h-8 text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-800/80 border-slate-700">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">Student</p>
+                  <p className="text-2xl font-bold text-emerald-300">{tierStats.student}</p>
+                </div>
+                <GraduationCap className="w-8 h-8 text-emerald-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Add User Form */}
         {showForm && (
           <Card className="mb-6 bg-slate-800/80 border-slate-700">
@@ -167,15 +295,16 @@ export default function AdminUsersPage() {
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleCreateUser}>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-slate-300">Username</Label>
+                  <Label htmlFor="username" className="text-slate-300">Username/Email</Label>
                   <Input
                     id="username"
+                    type="email"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                     className="bg-slate-700 border-slate-600 text-white"
-                    placeholder="Username"
+                    placeholder="email@example.com"
                     required
                   />
                 </div>
@@ -201,6 +330,19 @@ export default function AdminUsersPage() {
                     placeholder="Nama Lengkap"
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tier" className="text-slate-300">Tier</Label>
+                  <Select value={formData.tier} onValueChange={(value: UserTier) => setFormData({ ...formData, tier: value })}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="free">Gratis</SelectItem>
+                      <SelectItem value="tes">Tes (Rp 10.000/thn)</SelectItem>
+                      <SelectItem value="student">Student (Rp 25.000/thn)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
               <div className="px-6 pb-6">
@@ -234,7 +376,7 @@ export default function AdminUsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[calc(100vh-400px)]">
+            <ScrollArea className="h-[calc(100vh-500px)]">
               <div className="divide-y divide-slate-700">
                 {filteredUsers.map((user) => (
                   <div key={user.id} className="flex items-center justify-between p-4 hover:bg-slate-700/30">
@@ -247,13 +389,26 @@ export default function AdminUsersPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-white font-medium">{user.name}</span>
+                          <Badge className={`${TIER_INFO[user.tier].bgColor} ${TIER_INFO[user.tier].color}`}>
+                            {user.tier === 'tes' && <Crown className="w-3 h-3 mr-1" />}
+                            {user.tier === 'student' && <GraduationCap className="w-3 h-3 mr-1" />}
+                            {TIER_INFO[user.tier].name}
+                          </Badge>
                           <Badge variant={user.status === 'active' ? 'default' : 'secondary'}
                             className={user.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-600 text-slate-400'}>
                             {user.status === 'active' ? 'Active' : 'Inactive'}
                           </Badge>
                         </div>
-                        <div className="text-sm text-slate-400">
-                          @{user.username} • {user._count.progress} skills selesai • {user._count.testResults} test
+                        <div className="text-sm text-slate-400 flex items-center gap-4">
+                          <span>@{user.username}</span>
+                          <span>{user._count.progress} skills selesai</span>
+                          <span>{user._count.testResults} test</span>
+                          {user.tierExpiresAt && (
+                            <span className="flex items-center gap-1 text-xs">
+                              <Calendar className="w-3 h-3" />
+                              Exp: {new Date(user.tierExpiresAt).toLocaleDateString('id-ID')}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -261,8 +416,17 @@ export default function AdminUsersPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => openTierDialog(user)}
+                        className="border-blue-500/50 text-blue-300 hover:bg-blue-500/20"
+                        title="Ubah Tier"
+                      >
+                        <Crown className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleToggleStatus(user.id, user.status)}
-                        className={user.status === 'active' 
+                        className={user.status === 'active'
                           ? 'border-slate-600 text-slate-300 hover:bg-red-500/20 hover:text-red-400'
                           : 'border-slate-600 text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400'
                         }
@@ -290,6 +454,74 @@ export default function AdminUsersPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Tier Update Dialog */}
+      <Dialog open={showTierDialog} onOpenChange={setShowTierDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">Ubah Tier User</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {selectedUser?.name} ({selectedUser?.username})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="text-slate-300 mb-2 block">Pilih Tier Baru</Label>
+            <Select value={newTier} onValueChange={(value: UserTier) => setNewTier(value)}>
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">
+                  <div className="flex items-center gap-2">
+                    <span>Gratis</span>
+                    <span className="text-slate-400 text-xs">- Akses Paket A & B</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="tes">
+                  <div className="flex items-center gap-2">
+                    <span>Tes</span>
+                    <span className="text-blue-400 text-xs">- Rp 10.000/tahun</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="student">
+                  <div className="flex items-center gap-2">
+                    <span>Student</span>
+                    <span className="text-emerald-400 text-xs">- Rp 25.000/tahun</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {newTier !== 'free' && (
+              <p className="text-sm text-slate-400 mt-2">
+                Berlaku hingga: {new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID')}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowTierDialog(false)}
+              className="border-slate-600 text-slate-300"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleUpdateTier}
+              disabled={isUpdatingTier}
+              className="bg-emerald-500 hover:bg-emerald-600"
+            >
+              {isUpdatingTier ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                'Simpan'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

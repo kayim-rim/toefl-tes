@@ -81,11 +81,16 @@ export async function verifyPassword(password: string, storedHash: string): Prom
 // SESSION MANAGEMENT - Signed cookies
 // ============================================
 
+// User tier type
+export type UserTier = 'free' | 'tes' | 'student';
+
 export interface SessionUser {
   id: string;
   username: string;
   name: string;
   role: 'student' | 'admin';
+  tier: UserTier;
+  tierExpiresAt: string | null;
   iat: number; // Issued at timestamp
 }
 

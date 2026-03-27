@@ -2,31 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClientSimple } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 
-// PATCH - Update user status
+// PATCH - Update user status or tier
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const user = await getCurrentUser();
-    
+
     if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const resolvedParams = await params;
     const userId = resolvedParams.userId;
-    const { status } = await req.json();
+    const body = await req.json();
+    const { status, tier, tierExpiresAt } = body;
 
-    if (!status || !['active', 'inactive'].includes(status)) {
-      return NextResponse.json({ error: 'Status tidak valid' }, { status: 400 });
+    // Build update object
+    const updateData: Record<string, unknown> = {};
+
+    if (status !== undefined) {
+      if (!['active', 'inactive'].includes(status)) {
+        return NextResponse.json({ error: 'Status tidak valid' }, { status: 400 });
+      }
+      updateData.status = status;
+    }
+
+    if (tier !== undefined) {
+      if (!['free', 'tes', 'student'].includes(tier)) {
+        return NextResponse.json({ error: 'Tier tidak valid' }, { status: 400 });
+      }
+      updateData.tier = tier;
+      updateData.tier_expires_at = tierExpiresAt;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'Tidak ada data untuk diupdate' }, { status: 400 });
     }
 
     const supabase = createSupabaseServerClientSimple();
 
     const { error } = await supabase
       .from('users')
-      .update({ status })
+      .update(updateData)
       .eq('id', userId);
 
     if (error) {

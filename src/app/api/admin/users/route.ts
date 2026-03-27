@@ -21,6 +21,8 @@ export async function GET() {
         email,
         name,
         role,
+        tier,
+        tier_expires_at,
         created_at
       `)
       .eq('role', 'student')
@@ -62,7 +64,10 @@ export async function GET() {
       id: u.id,
       username: u.email, // Use email as username
       name: u.name,
+      email: u.email,
       status: 'active',
+      tier: u.tier || 'free',
+      tierExpiresAt: u.tier_expires_at,
       createdAt: u.created_at,
       _count: {
         progress: progressCounts[u.id] || 0,
@@ -81,12 +86,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    
+
     if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { username, password, name } = await req.json();
+    const { username, password, name, tier } = await req.json();
 
     if (!username || !password || !name) {
       return NextResponse.json({ error: 'Semua field diperlukan' }, { status: 400 });
@@ -108,6 +113,12 @@ export async function POST(req: NextRequest) {
     // Hash password with bcrypt (async)
     const hashedPassword = await hashPassword(password);
 
+    // Calculate tier expiry (1 year for non-free tiers)
+    const userTier = tier || 'free';
+    const tierExpiresAt = userTier !== 'free'
+      ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+
     // Create user (using email field as username)
     const { data: newUser, error } = await supabase
       .from('users')
@@ -116,6 +127,8 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         name,
         role: 'student',
+        tier: userTier,
+        tier_expires_at: tierExpiresAt,
       })
       .select()
       .single();
@@ -132,6 +145,8 @@ export async function POST(req: NextRequest) {
         username: newUser.email,
         name: newUser.name,
         status: 'active',
+        tier: newUser.tier || 'free',
+        tierExpiresAt: newUser.tier_expires_at,
       },
     });
   } catch (error) {
