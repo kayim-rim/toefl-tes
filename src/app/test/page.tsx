@@ -1,40 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Trophy, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Trophy, ArrowLeft, FileText, Lock, Crown } from 'lucide-react';
 
-export default function TestRegistrationPage() {
+export default function TestPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [institution, setInstitution] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!name.trim()) {
-      setError('Nama harus diisi');
-      return;
-    }
-
-    setIsLoading(true);
-
-    // Save to sessionStorage for the test flow
-    sessionStorage.setItem('testName', name);
-    sessionStorage.setItem('testInstitution', institution);
-    sessionStorage.setItem('testUser', JSON.stringify({ name, institution }));
-
-    // Navigate to package selection
+  // Redirect to package selection directly
+  useEffect(() => {
     router.push('/test/package');
-  };
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
@@ -49,60 +28,14 @@ export default function TestRegistrationPage() {
           </div>
           <CardTitle className="text-2xl text-white">Simulasi Test TOEFL ITP</CardTitle>
           <CardDescription className="text-slate-400">
-            Masukkan data Anda untuk memulai simulasi test
+            Mengalihkan ke pemilihan paket...
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-slate-300">Nama Lengkap *</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Masukkan nama lengkap"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="institution" className="text-slate-300">Institusi/Sekolah (Opsional)</Label>
-              <Input
-                id="institution"
-                type="text"
-                placeholder="Nama sekolah atau universitas"
-                value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
-                disabled={isLoading}
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
-              disabled={isLoading || !name.trim()}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Memproses...
-                </>
-              ) : (
-                'Lanjutkan'
-              )}
-            </Button>
-          </CardFooter>
-        </form>
+        <CardContent className="text-center">
+          <div className="animate-pulse text-slate-400">
+            Silakan tunggu...
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, CheckCircle, Lock, Crown, GraduationCap, LogIn, UserPlus } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Lock, Crown, GraduationCap, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { packages } from '@/data/packages';
 
 // Tier type
@@ -26,6 +28,9 @@ const TIER_PACKAGE_ACCESS: Record<UserTier, string[]> = {
   tes: ['package_A', 'package_B', 'package_C', 'package_D'],
   student: ['package_A', 'package_B', 'package_C', 'package_D']
 };
+
+// Free packages - accessible without login
+const FREE_PACKAGES = ['package_A', 'package_B'];
 
 // Tier display info
 const TIER_INFO: Record<UserTier, { name: string; color: string; icon: React.ReactNode }> = {
@@ -53,6 +58,12 @@ export default function PackageSelectionContent() {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [clickedPackage, setClickedPackage] = useState<string | null>(null);
 
+  // Name input dialog for free packages
+  const [showNameDialog, setShowNameDialog] = useState(false);
+  const [name, setName] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
+
   // Fetch user data
   useEffect(() => {
     const fetchUser = async () => {
@@ -70,17 +81,6 @@ export default function PackageSelectionContent() {
     };
     fetchUser();
   }, []);
-
-  // Read from sessionStorage using useMemo
-  const userInfo = useMemo(() => {
-    if (typeof window === 'undefined') return { name: '', institution: '', hasName: false };
-    const name = sessionStorage.getItem('testName') || '';
-    const institution = sessionStorage.getItem('testInstitution') || '';
-    return { name, institution, hasName: !!name };
-  }, []);
-
-  const name = user?.name || userInfo.name;
-  const institution = userInfo.institution;
 
   // Get user tier (default to free if not logged in)
   const userTier: UserTier = user?.tier || 'free';
@@ -100,28 +100,55 @@ export default function PackageSelectionContent() {
     return TIER_PACKAGE_ACCESS[effectiveTier].includes(packageId);
   };
 
-  // If no name, redirect back to registration
-  useEffect(() => {
-    if (!isLoadingUser && !userInfo.hasName && !user) {
-      router.push('/test');
-    }
-  }, [isLoadingUser, userInfo.hasName, user, router]);
+  // Check if package is free (no login required)
+  const isFreePackage = (packageId: string): boolean => {
+    return FREE_PACKAGES.includes(packageId);
+  };
 
   const handleSelectPackage = (packageId: string) => {
-    if (canAccessPackage(packageId)) {
-      setSelectedPackage(packageId);
+    setSelectedPackage(packageId);
+  };
+
+  const handleStartTest = () => {
+    if (!selectedPackage) return;
+
+    if (canAccessPackage(selectedPackage)) {
+      // Check if it's a free package and user is not logged in
+      if (isFreePackage(selectedPackage) && !user) {
+        // Show name input dialog
+        setShowNameDialog(true);
+      } else if (user) {
+        // User is logged in, proceed directly
+        sessionStorage.setItem('testPackage', selectedPackage);
+        sessionStorage.setItem('testName', user.name);
+        router.push('/test/exam');
+      } else {
+        // Non-free package but has access (shouldn't happen, but just in case)
+        sessionStorage.setItem('testPackage', selectedPackage);
+        router.push('/test/exam');
+      }
     } else {
       // Show upgrade dialog
-      setClickedPackage(packageId);
+      setClickedPackage(selectedPackage);
       setShowUpgradeDialog(true);
     }
   };
 
-  const handleStartTest = () => {
-    if (selectedPackage && canAccessPackage(selectedPackage)) {
-      sessionStorage.setItem('testPackage', selectedPackage);
-      router.push('/test/exam');
-    }
+  const handleStartFreeTest = () => {
+    if (!name.trim()) return;
+
+    setIsStarting(true);
+    sessionStorage.setItem('testPackage', selectedPackage);
+    sessionStorage.setItem('testName', name);
+    sessionStorage.setItem('testInstitution', institution);
+    sessionStorage.setItem('testUser', JSON.stringify({ name, institution }));
+
+    router.push('/test/exam');
+  };
+
+  const handleLockedPackageClick = (packageId: string) => {
+    setClickedPackage(packageId);
+    setShowUpgradeDialog(true);
   };
 
   const handleLoginClick = () => {
@@ -139,11 +166,19 @@ export default function PackageSelectionContent() {
     router.push('/pricing');
   };
 
+  if (isLoadingUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <header className="border-b border-slate-700/50 backdrop-blur-sm bg-slate-900/50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/test" className="text-slate-400 hover:text-slate-200 flex items-center gap-2">
+          <Link href="/" className="text-slate-400 hover:text-slate-200 flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
             Kembali
           </Link>
@@ -157,23 +192,60 @@ export default function PackageSelectionContent() {
             </div>
           </div>
           <div className="text-right">
-            <div className="flex items-center gap-2 justify-end">
-              <p className="text-sm text-white">{name}</p>
-              {user && (
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white">{user.name}</span>
                 <Badge className={`${TIER_INFO[effectiveTier].color} text-white text-xs`}>
                   {TIER_INFO[effectiveTier].icon}
                   <span className="ml-1">{TIER_INFO[effectiveTier].name}</span>
                 </Badge>
-              )}
-            </div>
-            {institution && <p className="text-xs text-slate-400">{institution}</p>}
+              </div>
+            ) : (
+              <Link href="/login" className="text-emerald-400 hover:text-emerald-300 text-sm">
+                Login
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Tier info banner */}
-        {effectiveTier === 'free' && (
+        {/* Info banner for non-logged users */}
+        {!user && (
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-white font-medium flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-emerald-400" />
+                  Paket A & B Gratis Tanpa Login
+                </h3>
+                <p className="text-slate-400 text-sm mt-1">
+                  Pilih paket gratis atau login untuk akses semua fitur
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleRegisterClick}
+                  variant="outline"
+                  className="border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/20"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Daftar
+                </Button>
+                <Button
+                  onClick={handleLoginClick}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500"
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Login
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tier info banner for logged users with free tier */}
+        {user && effectiveTier === 'free' && (
           <div className="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-emerald-500/10 border border-blue-500/30 rounded-lg">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
@@ -198,22 +270,36 @@ export default function PackageSelectionContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {packages.map((pkg) => {
             const isAccessible = canAccessPackage(pkg.id);
+            const isFree = isFreePackage(pkg.id);
             const isLocked = !isAccessible;
 
             return (
               <Card
                 key={pkg.id}
-                className={`relative transition-all ${
+                className={`relative transition-all cursor-pointer ${
                   isLocked
-                    ? 'bg-slate-800/50 border-slate-700 opacity-75 cursor-pointer'
+                    ? 'bg-slate-800/50 border-slate-700 opacity-75'
                     : selectedPackage === pkg.id
-                      ? 'bg-slate-700 border-blue-500 ring-2 ring-blue-500 cursor-pointer'
-                      : 'bg-slate-800/80 border-slate-700 hover:border-slate-500 cursor-pointer'
+                      ? 'bg-slate-700 border-blue-500 ring-2 ring-blue-500'
+                      : 'bg-slate-800/80 border-slate-700 hover:border-slate-500'
                 }`}
-                onClick={() => handleSelectPackage(pkg.id)}
+                onClick={() => isLocked ? handleLockedPackageClick(pkg.id) : handleSelectPackage(pkg.id)}
               >
+                {/* Free badge for packages A & B */}
+                {isFree && !isLocked && (
+                  <div className="absolute -top-2 -right-2 z-10">
+                    <Badge className="bg-emerald-500 text-white text-xs">Gratis</Badge>
+                  </div>
+                )}
+
                 {isLocked && (
-                  <div className="absolute inset-0 bg-slate-900/50 rounded-lg flex flex-col items-center justify-center z-10">
+                  <div
+                    className="absolute inset-0 bg-slate-900/50 rounded-lg flex flex-col items-center justify-center z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLockedPackageClick(pkg.id);
+                    }}
+                  >
                     <Lock className="w-8 h-8 text-slate-400 mb-2" />
                     <span className="text-slate-300 text-sm font-medium">Paket Premium</span>
                     <span className="text-blue-400 text-xs mt-1">Klik untuk upgrade</span>
@@ -274,67 +360,74 @@ export default function PackageSelectionContent() {
             Pilih paket soal terlebih dahulu
           </p>
         )}
+      </main>
 
-        {/* Pricing info */}
-        {effectiveTier === 'free' && (
-          <div className="mt-12 max-w-2xl mx-auto">
-            <h3 className="text-xl font-bold text-white text-center mb-6">Upgrade Akses</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="bg-slate-800/80 border-slate-700 hover:border-blue-500/50 transition-colors">
-                <CardHeader className="text-center">
-                  <Badge className="bg-blue-500 text-white mx-auto mb-2">Paket Tes</Badge>
-                  <CardTitle className="text-2xl text-white">Rp 10.000</CardTitle>
-                  <CardDescription className="text-slate-400">per tahun</CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm text-slate-300 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-400" />
-                    <span>Semua paket soal (A, B, C, D)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-400" />
-                    <span>Pembahasan lengkap</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-400" />
-                    <span>History & Analytics</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-400" />
-                    <span>Sertifikat</span>
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Name Input Dialog for Free Packages */}
+      <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Masukkan Data Anda</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Untuk memulai test {selectedPackage?.replace('package_', 'Paket ')}, masukkan nama Anda.
+            </DialogDescription>
+          </DialogHeader>
 
-              <Card className="bg-slate-800/80 border-slate-700 hover:border-emerald-500/50 transition-colors">
-                <CardHeader className="text-center">
-                  <Badge className="bg-emerald-500 text-white mx-auto mb-2">Paket Student</Badge>
-                  <CardTitle className="text-2xl text-white">Rp 25.000</CardTitle>
-                  <CardDescription className="text-slate-400">per tahun</CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm text-slate-300 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span>Semua fitur Paket Tes</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span>Learning Class lengkap</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span>Latihan per skill</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span>Progress tracking detail</span>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-slate-300">Nama Lengkap *</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Masukkan nama lengkap"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="institution" className="text-slate-300">Institusi/Sekolah (Opsional)</Label>
+              <Input
+                id="institution"
+                type="text"
+                placeholder="Nama sekolah atau universitas"
+                value={institution}
+                onChange={(e) => setInstitution(e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
+              />
+            </div>
+
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-sm">
+              <p className="text-emerald-400">
+                Test ini gratis! Daftar akun untuk menyimpan progress dan hasil test Anda.
+              </p>
             </div>
           </div>
-        )}
-      </main>
+
+          <DialogFooter className="flex-col gap-2">
+            <Button
+              onClick={handleStartFreeTest}
+              disabled={!name.trim() || isStarting}
+              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+            >
+              {isStarting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Memulai...
+                </>
+              ) : (
+                'Mulai Test'
+              )}
+            </Button>
+            <p className="text-xs text-slate-400 text-center">
+              Atau{' '}
+              <button onClick={handleRegisterClick} className="text-emerald-400 hover:text-emerald-300">
+                daftar akun
+              </button>
+              {' '}untuk menyimpan progress
+            </p>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Upgrade Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
@@ -367,21 +460,14 @@ export default function PackageSelectionContent() {
             </div>
 
             {!user && (
-              <div className="space-y-2">
-                <p className="text-slate-300 text-sm font-medium">Sudah punya akun?</p>
+              <div className="space-y-3">
                 <Button
                   onClick={handleLoginClick}
                   className="w-full bg-slate-700 hover:bg-slate-600 text-white"
                 >
                   <LogIn className="w-4 h-4 mr-2" />
-                  Login
+                  Sudah punya akun? Login
                 </Button>
-              </div>
-            )}
-
-            {!user && (
-              <div className="space-y-2">
-                <p className="text-slate-300 text-sm font-medium">Belum punya akun?</p>
                 <Button
                   onClick={handleRegisterClick}
                   className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
@@ -393,16 +479,13 @@ export default function PackageSelectionContent() {
             )}
 
             {user && (
-              <div className="space-y-2">
-                <p className="text-slate-300 text-sm font-medium">Tingkatkan tier akun Anda:</p>
-                <Button
-                  onClick={handlePricingClick}
-                  className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600"
-                >
-                  <Crown className="w-4 h-4 mr-2" />
-                  Lihat Paket Upgrade
-                </Button>
-              </div>
+              <Button
+                onClick={handlePricingClick}
+                className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Lihat Paket Upgrade
+              </Button>
             )}
           </div>
 
