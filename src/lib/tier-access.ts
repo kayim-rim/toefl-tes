@@ -8,17 +8,17 @@ export const TIER_LEVELS: Record<UserTier, number> = {
   student: 2
 };
 
-// Package IDs that each tier can access
+// Package IDs that each tier can access (using actual package IDs: A, B, C, D)
 export const TIER_PACKAGE_ACCESS: Record<UserTier, string[]> = {
-  free: ['package_A', 'package_B'],
-  tes: ['package_A', 'package_B', 'package_C', 'package_D'],
-  student: ['package_A', 'package_B', 'package_C', 'package_D']
+  free: ['A', 'B'],
+  tes: ['A', 'B', 'C', 'D'],
+  student: ['A', 'B', 'C', 'D']
 };
 
 // Feature access by tier
 export const TIER_FEATURES = {
   free: {
-    testPackages: ['package_A', 'package_B'],
+    testPackages: ['A', 'B'],
     learningAccess: false,
     detailedExplanation: false,
     historyAnalytics: false,
@@ -26,7 +26,7 @@ export const TIER_FEATURES = {
     maxTestsPerDay: 3
   },
   tes: {
-    testPackages: ['package_A', 'package_B', 'package_C', 'package_D'],
+    testPackages: ['A', 'B', 'C', 'D'],
     learningAccess: false,
     detailedExplanation: true,
     historyAnalytics: true,
@@ -34,7 +34,7 @@ export const TIER_FEATURES = {
     maxTestsPerDay: Infinity
   },
   student: {
-    testPackages: ['package_A', 'package_B', 'package_C', 'package_D'],
+    testPackages: ['A', 'B', 'C', 'D'],
     learningAccess: true,
     detailedExplanation: true,
     historyAnalytics: true,
@@ -121,7 +121,7 @@ export function getRestrictedPackages(
   tierExpiresAt: string | null
 ): string[] {
   const effectiveTier = getEffectiveTier(userTier, tierExpiresAt);
-  const allPackages = ['package_A', 'package_B', 'package_C', 'package_D'];
+  const allPackages = ['A', 'B', 'C', 'D'];
   const accessiblePackages = TIER_PACKAGE_ACCESS[effectiveTier];
 
   return allPackages.filter(pkg => !accessiblePackages.includes(pkg));
