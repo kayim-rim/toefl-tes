@@ -22,15 +22,15 @@ import { packages } from '@/data/packages';
 // Tier type
 type UserTier = 'free' | 'tes' | 'student';
 
-// Tier package access
+// Tier package access - using actual package IDs: A, B, C, D
 const TIER_PACKAGE_ACCESS: Record<UserTier, string[]> = {
-  free: ['package_A', 'package_B'],
-  tes: ['package_A', 'package_B', 'package_C', 'package_D'],
-  student: ['package_A', 'package_B', 'package_C', 'package_D']
+  free: ['A', 'B'],
+  tes: ['A', 'B', 'C', 'D'],
+  student: ['A', 'B', 'C', 'D']
 };
 
-// Free packages - accessible without login
-const FREE_PACKAGES = ['package_A', 'package_B'];
+// Free packages - accessible without login (Package A & B)
+const FREE_PACKAGES = ['A', 'B'];
 
 // Tier display info
 const TIER_INFO: Record<UserTier, { name: string; color: string; icon: React.ReactNode }> = {
@@ -97,6 +97,9 @@ export default function PackageSelectionContent() {
 
   // Check if user can access a package
   const canAccessPackage = (packageId: string): boolean => {
+    // Free packages are always accessible
+    if (FREE_PACKAGES.includes(packageId)) return true;
+    // For premium packages, check tier
     return TIER_PACKAGE_ACCESS[effectiveTier].includes(packageId);
   };
 
@@ -368,7 +371,7 @@ export default function PackageSelectionContent() {
           <DialogHeader>
             <DialogTitle className="text-white">Masukkan Data Anda</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Untuk memulai test {selectedPackage?.replace('package_', 'Paket ')}, masukkan nama Anda.
+              Untuk memulai test {selectedPackage === 'A' ? 'Paket A' : selectedPackage === 'B' ? 'Paket B' : 'test'}, masukkan nama Anda.
             </DialogDescription>
           </DialogHeader>
 
@@ -438,7 +441,7 @@ export default function PackageSelectionContent() {
               Upgrade Akses
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Paket {clickedPackage?.replace('package_', 'Paket ')} memerlukan akun dengan tier yang lebih tinggi.
+              {clickedPackage === 'C' ? 'Paket C' : clickedPackage === 'D' ? 'Paket D' : 'Paket ini'} memerlukan akun dengan tier yang lebih tinggi.
             </DialogDescription>
           </DialogHeader>
 
