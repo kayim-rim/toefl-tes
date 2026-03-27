@@ -406,7 +406,7 @@ export default function PackageSelectionContent() {
             </div>
           </div>
 
-          <DialogFooter className="flex-col gap-2">
+          <div className="space-y-3">
             <Button
               onClick={handleStartFreeTest}
               disabled={!name.trim() || isStarting}
@@ -421,14 +421,14 @@ export default function PackageSelectionContent() {
                 'Mulai Test'
               )}
             </Button>
-            <p className="text-xs text-slate-400 text-center">
+            <p className="text-xs text-slate-400 text-center pt-2">
               Atau{' '}
-              <button onClick={handleRegisterClick} className="text-emerald-400 hover:text-emerald-300">
+              <button onClick={handleRegisterClick} className="text-emerald-400 hover:text-emerald-300 underline">
                 daftar akun
               </button>
               {' '}untuk menyimpan progress
             </p>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
