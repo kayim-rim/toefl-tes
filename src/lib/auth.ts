@@ -1,54 +1,78 @@
 // Authentication utilities for TOEFL ITP Learning Center
 import { cookies } from 'next/headers';
 import { cache } from 'react';
-import { createHash, createHmac, randomBytes } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
+import bcrypt from 'bcryptjs';
 
 // Session cookie name
 const SESSION_COOKIE = 'toefl_session';
 
-// Secret key for HMAC signing (in production, use environment variable)
-const getSecretKey = () => {
-  return process.env.SESSION_SECRET || 'toefl-itp-secret-key-2024-secure';
-};
+// ============================================
+// SECURITY: Session Secret - NO FALLBACK
+// ============================================
+// IMPORTANT: You MUST set SESSION_SECRET in your environment variables!
+// Generate a secure random string: openssl rand -base64 32
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+
+  if (!secret) {
+    // In development, show warning but still fail gracefully
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ WARNING: SESSION_SECRET not set! Using insecure development secret.');
+      console.warn('⚠️ Set SESSION_SECRET in your .env file for production!');
+      return 'dev-insecure-secret-please-set-session-secret-in-production';
+    }
+
+    throw new Error(
+      'SESSION_SECRET environment variable is required for security. ' +
+      'Generate one with: openssl rand -base64 32'
+    );
+  }
+
+  return secret;
+}
 
 // ============================================
-// PASSWORD HASHING - SHA-256 with salt
+// PASSWORD HASHING - bcrypt (Industry Standard)
 // ============================================
+
+const BCRYPT_ROUNDS = 12; // ~250ms hash time, good balance
 
 /**
- * Hash password using SHA-256 with salt
- * This is a proper cryptographic hash (one-way), not just encoding like base64
+ * Hash password using bcrypt (slow hashing algorithm)
+ * bcrypt is designed for passwords - it's slow by design to resist brute force
  */
-export function hashPassword(password: string): string {
-  // Generate a random salt for each password
-  const salt = randomBytes(16).toString('hex');
-  // Hash password + salt using SHA-256
-  const hash = createHash('sha256')
-    .update(password + salt)
-    .digest('hex');
-  // Return salt:hash format (so we can verify later)
-  return `${salt}:${hash}`;
+export async function hashPassword(password: string): Promise<string> {
+  const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
+  return bcrypt.hash(password, salt);
 }
 
 /**
  * Verify password against stored hash
+ * Supports both bcrypt (new) and legacy SHA-256 (old) formats
  */
-export function verifyPassword(password: string, storedHash: string): boolean {
+export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   try {
-    // Handle legacy base64 format (for backward compatibility)
-    if (!storedHash.includes(':')) {
-      // Old format: base64 encoding - verify with old method
-      const legacyHash = Buffer.from(password + '_toefl_salt').toString('base64');
-      return legacyHash === storedHash;
+    // Check if it's bcrypt format (starts with $2a$, $2b$, or $2y$)
+    if (storedHash.startsWith('$2')) {
+      return bcrypt.compare(password, storedHash);
     }
 
-    // New format: salt:hash
-    const [salt, hash] = storedHash.split(':');
-    const verifyHash = createHash('sha256')
-      .update(password + salt)
-      .digest('hex');
-    return hash === verifyHash;
-  } catch {
+    // Check if it's our SHA-256 salt:hash format
+    if (storedHash.includes(':') && storedHash.length > 40) {
+      const [salt, hash] = storedHash.split(':');
+      const crypto = await import('crypto');
+      const verifyHash = crypto.createHash('sha256')
+        .update(password + salt)
+        .digest('hex');
+      return hash === verifyHash;
+    }
+
+    // Legacy base64 format (oldest) - for backward compatibility
+    const legacyHash = Buffer.from(password + '_toefl_salt').toString('base64');
+    return legacyHash === storedHash;
+  } catch (error) {
+    console.error('Password verification error:', error);
     return false;
   }
 }
@@ -73,8 +97,8 @@ interface SignedSession {
 /**
  * Create HMAC signature for session data
  */
-function signData(data: string): string {
-  return createHmac('sha256', getSecretKey())
+function signData(data: string, secret: string): string {
+  return createHmac('sha256', secret)
     .update(data)
     .digest('hex');
 }
@@ -82,14 +106,14 @@ function signData(data: string): string {
 /**
  * Create signed session token
  */
-function createSignedSession(user: Omit<SessionUser, 'iat'>): string {
+function createSignedSession(user: Omit<SessionUser, 'iat'>, secret: string): string {
   const sessionUser: SessionUser = {
     ...user,
     iat: Math.floor(Date.now() / 1000),
   };
 
   const dataString = JSON.stringify(sessionUser);
-  const signature = signData(dataString);
+  const signature = signData(dataString, secret);
 
   const signedSession: SignedSession = {
     data: sessionUser,
@@ -102,14 +126,14 @@ function createSignedSession(user: Omit<SessionUser, 'iat'>): string {
 /**
  * Verify and decode signed session token
  */
-function verifySignedSession(token: string): SessionUser | null {
+function verifySignedSession(token: string, secret: string): SessionUser | null {
   try {
     const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
 
     // Check if it's the new signed format
     if (decoded.data && decoded.signature) {
       const dataString = JSON.stringify(decoded.data);
-      const expectedSignature = signData(dataString);
+      const expectedSignature = signData(dataString, secret);
 
       // Verify signature
       if (decoded.signature !== expectedSignature) {
@@ -119,9 +143,8 @@ function verifySignedSession(token: string): SessionUser | null {
       return decoded.data as SessionUser;
     }
 
-    // Legacy format (unsigned) - for backward compatibility
-    // But we'll reject it for sensitive operations
-    return decoded as SessionUser;
+    // Legacy format (unsigned) - reject for security
+    return null;
   } catch {
     return null;
   }
@@ -142,7 +165,8 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 
     if (!sessionData) return null;
 
-    return verifySignedSession(sessionData);
+    const secret = getSessionSecret();
+    return verifySignedSession(sessionData, secret);
   } catch {
     return null;
   }
@@ -153,7 +177,8 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
  */
 export async function setSessionCookie(user: Omit<SessionUser, 'iat'>): Promise<void> {
   const cookieStore = await cookies();
-  const sessionToken = createSignedSession(user);
+  const secret = getSessionSecret();
+  const sessionToken = createSignedSession(user, secret);
 
   cookieStore.set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,

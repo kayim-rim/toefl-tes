@@ -1,23 +1,7 @@
-// Simple Rate Limiting Utility
-// Uses in-memory store (resets on server restart, but sufficient for basic protection)
+// Rate Limiting Utility - Serverless Compatible
+// Uses Supabase for persistence (works on Vercel, AWS Lambda, etc.)
 
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
-
-// In-memory store for rate limiting
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-// Clean up old entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetTime) {
-      rateLimitStore.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
+import { createSupabaseServerClientSimple } from '@/lib/supabase/server';
 
 export interface RateLimitConfig {
   windowMs: number;    // Time window in milliseconds
@@ -30,52 +14,8 @@ export interface RateLimitResult {
   resetTime: number;
 }
 
-/**
- * Check rate limit for a given key
- * @param key - Unique identifier (e.g., IP address or user ID)
- * @param config - Rate limit configuration
- * @returns Rate limit result
- */
-export function checkRateLimit(
-  key: string,
-  config: RateLimitConfig = { windowMs: 60000, maxRequests: 5 }
-): RateLimitResult {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-
-  if (!entry || now > entry.resetTime) {
-    // Create new entry
-    rateLimitStore.set(key, {
-      count: 1,
-      resetTime: now + config.windowMs,
-    });
-
-    return {
-      success: true,
-      remaining: config.maxRequests - 1,
-      resetTime: now + config.windowMs,
-    };
-  }
-
-  // Entry exists and within window
-  if (entry.count >= config.maxRequests) {
-    return {
-      success: false,
-      remaining: 0,
-      resetTime: entry.resetTime,
-    };
-  }
-
-  // Increment count
-  entry.count++;
-  rateLimitStore.set(key, entry);
-
-  return {
-    success: true,
-    remaining: config.maxRequests - entry.count,
-    resetTime: entry.resetTime,
-  };
-}
+// Table name for rate limiting
+const RATE_LIMIT_TABLE = 'rate_limits';
 
 /**
  * Get client identifier for rate limiting
@@ -85,12 +25,135 @@ export function getClientIdentifier(request: Request): string {
   // Check for forwarded header (Vercel, Cloudflare, etc.)
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
-    // Take the first IP in the chain
+    // Take the first IP in the chain (original client)
     return forwarded.split(',')[0].trim();
   }
 
-  // Fallback to a default identifier
+  // Check for real-ip header (some proxies)
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp.trim();
+  }
+
+  // Fallback identifier
   return 'unknown';
+}
+
+/**
+ * Clean up expired rate limit entries
+ * Called periodically to keep table clean
+ */
+async function cleanupExpiredEntries(): Promise<void> {
+  try {
+    const supabase = createSupabaseServerClientSimple();
+    const now = new Date().toISOString();
+
+    await supabase
+      .from(RATE_LIMIT_TABLE)
+      .delete()
+      .lt('reset_at', now);
+  } catch (error) {
+    // Silently fail - cleanup is not critical
+    console.error('Rate limit cleanup error:', error);
+  }
+}
+
+/**
+ * Check rate limit for a given key using Supabase
+ * This works in serverless environments like Vercel
+ *
+ * @param key - Unique identifier (e.g., IP address or user ID)
+ * @param config - Rate limit configuration
+ * @returns Rate limit result
+ */
+export async function checkRateLimit(
+  key: string,
+  config: RateLimitConfig = { windowMs: 60000, maxRequests: 5 }
+): Promise<RateLimitResult> {
+  const supabase = createSupabaseServerClientSimple();
+  const now = Date.now();
+  const resetTime = now + config.windowMs;
+  const resetTimeISO = new Date(resetTime).toISOString();
+
+  try {
+    // Try to get existing entry
+    const { data: existing, error: fetchError } = await supabase
+      .from(RATE_LIMIT_TABLE)
+      .select('*')
+      .eq('key', key)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      // PGRST116 = no rows found, other errors are actual problems
+      console.error('Rate limit fetch error:', fetchError);
+      // Fail open - don't block requests if rate limiting fails
+      return { success: true, remaining: config.maxRequests, resetTime };
+    }
+
+    // No existing entry or expired - create new
+    if (!existing || new Date(existing.reset_at).getTime() < now) {
+      const { error: insertError } = await supabase
+        .from(RATE_LIMIT_TABLE)
+        .upsert({
+          key,
+          count: 1,
+          reset_at: resetTimeISO,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+
+      if (insertError) {
+        console.error('Rate limit insert error:', insertError);
+        // Fail open
+        return { success: true, remaining: config.maxRequests, resetTime };
+      }
+
+      // Occasionally clean up old entries (1% chance)
+      if (Math.random() < 0.01) {
+        cleanupExpiredEntries().catch(() => {});
+      }
+
+      return {
+        success: true,
+        remaining: config.maxRequests - 1,
+        resetTime,
+      };
+    }
+
+    // Entry exists and is within window
+    const currentCount = existing.count || 0;
+
+    if (currentCount >= config.maxRequests) {
+      return {
+        success: false,
+        remaining: 0,
+        resetTime: new Date(existing.reset_at).getTime(),
+      };
+    }
+
+    // Increment count
+    const newCount = currentCount + 1;
+    const { error: updateError } = await supabase
+      .from(RATE_LIMIT_TABLE)
+      .update({
+        count: newCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('key', key);
+
+    if (updateError) {
+      console.error('Rate limit update error:', updateError);
+    }
+
+    return {
+      success: true,
+      remaining: config.maxRequests - newCount,
+      resetTime: new Date(existing.reset_at).getTime(),
+    };
+  } catch (error) {
+    console.error('Rate limit error:', error);
+    // Fail open - don't block requests if rate limiting fails
+    return { success: true, remaining: config.maxRequests, resetTime };
+  }
 }
 
 /**

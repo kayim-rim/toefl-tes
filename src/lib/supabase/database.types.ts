@@ -146,6 +146,29 @@ export interface Database {
           created_at?: string
         }
       }
+      rate_limits: {
+        Row: {
+          id: string
+          key: string
+          count: number
+          reset_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          count?: number
+          reset_at: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          count?: number
+          reset_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

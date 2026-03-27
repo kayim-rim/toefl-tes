@@ -5,9 +5,9 @@ import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-lim
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting check
+    // Rate limiting check (async - uses Supabase for persistence)
     const clientId = getClientIdentifier(req);
-    const rateLimit = checkRateLimit(`login:${clientId}`, RATE_LIMITS.LOGIN);
+    const rateLimit = await checkRateLimit(`login:${clientId}`, RATE_LIMITS.LOGIN);
 
     if (!rateLimit.success) {
       return NextResponse.json(
@@ -55,8 +55,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Admin harus login di /admin/login' }, { status: 401 });
     }
 
-    // Verify password using secure comparison
-    if (!verifyPassword(password, user.password)) {
+    // Verify password using bcrypt (async)
+    const isValidPassword = await verifyPassword(password, user.password || '');
+    if (!isValidPassword) {
       return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
     }
 

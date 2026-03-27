@@ -105,12 +105,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 400 });
     }
 
+    // Hash password with bcrypt (async)
+    const hashedPassword = await hashPassword(password);
+
     // Create user (using email field as username)
     const { data: newUser, error } = await supabase
       .from('users')
       .insert({
         email: username, // Use email field for username
-        password: hashPassword(password),
+        password: hashedPassword,
         name,
         role: 'student',
       })
